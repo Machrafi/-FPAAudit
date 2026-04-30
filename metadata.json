@@ -1,0 +1,6 @@
+{
+  "name": "FingerprintAudit",
+  "description": "Professional diagnostic tool for browser fingerprinting and anti-fraud detection analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
