@@ -49,14 +49,31 @@ export default function ComparePage() {
     };
 
     addRow("Public IP", dataA.network.public_ip, dataB.network.public_ip);
+    addRow("WebRTC Public IPs", dataA.network.webrtc_public_ips?.join(', '), dataB.network.webrtc_public_ips?.join(', '));
     addRow("Canvas Hash", dataA.rendering.canvas_hash, dataB.rendering.canvas_hash);
     addRow("WebGL Renderer", dataA.rendering.webgl.renderer, dataB.rendering.webgl.renderer);
+    addRow("Fonts Hash", dataA.rendering.fonts.fingerprint_hash, dataB.rendering.fonts.fingerprint_hash);
     addRow("Hardware Cores", dataA.hardware.hardware_concurrency, dataB.hardware.hardware_concurrency);
     addRow("Device Memory", dataA.hardware.device_memory, dataB.hardware.device_memory);
     addRow("Resolution", `${dataA.hardware.screen.width}x${dataA.hardware.screen.height}`, `${dataB.hardware.screen.width}x${dataB.hardware.screen.height}`);
     addRow("User Agent", dataA.client.user_agent, dataB.client.user_agent);
     addRow("Timezone", dataA.locale.timezone, dataB.locale.timezone);
-    addRow("Audio Context", dataA.audio.id, dataB.audio.id);
+    addRow("Audio Context Hash", dataA.audio.id, dataB.audio.id);
+    addRow("Automation: Headless Ind.", dataA.automation_detection?.headless_chrome_indicators?.length, dataB.automation_detection?.headless_chrome_indicators?.length);
+    addRow("Automation: Navigator WebDriver", dataA.automation_detection?.navigator_webdriver, dataB.automation_detection?.navigator_webdriver);
+    if (dataA.network.tls_fingerprint && dataB.network.tls_fingerprint) {
+       addRow("JA3 Hash", dataA.network.tls_fingerprint.ja3_hash, dataB.network.tls_fingerprint.ja3_hash);
+       addRow("JA4 Fingerprint", dataA.network.tls_fingerprint.ja4, dataB.network.tls_fingerprint.ja4);
+       addRow("PeetPrint Hash", dataA.network.tls_fingerprint.peetprint_hash, dataB.network.tls_fingerprint.peetprint_hash);
+       addRow("Akamai HTTP/2 Hash", dataA.network.tls_fingerprint.http2_akamai_hash, dataB.network.tls_fingerprint.http2_akamai_hash);
+    }
+    if (dataA.deep && dataB.deep) {
+       addRow("Deep: Math Hash", dataA.deep.math_fingerprint, dataB.deep.math_fingerprint);
+       addRow("Deep: Media Queries", dataA.deep.css_media_queries?.join(','), dataB.deep.css_media_queries?.join(','));
+       addRow("Deep: WebGPU", typeof dataA.hardware.webgpu === 'object' ? dataA.hardware.webgpu?.vendor : dataA.hardware.webgpu, typeof dataB.hardware.webgpu === 'object' ? dataB.hardware.webgpu?.vendor : dataB.hardware.webgpu);
+       addRow("Deep: Mime Types", dataA.deep.mime_types?.count, dataB.deep.mime_types?.count);
+       addRow("Deep: Plugins", dataA.deep.plugins?.count, dataB.deep.plugins?.count);
+    }
 
     setComparison(diff);
   };

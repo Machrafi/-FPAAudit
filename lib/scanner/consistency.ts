@@ -11,9 +11,14 @@ export function runConsistencyChecks(signals: any) {
     checks.push({ check: 'ua_platform_mismatch', passed: true, details: 'UA and WebGL platform consistent' });
   }
 
-  // Timezone vs IP (This would normally need IP location, placeholders for now)
-  // if (signals.network?.timezone && signals.locale?.timezone && signals.network.timezone !== signals.locale.timezone) { ... }
-  checks.push({ check: 'timezone_ip_mismatch', passed: true, details: 'Timezone aligns with IP geolocation' });
+  // Timezone vs IP
+  const ipTimezone = signals.network?.timezone;
+  const browserTimezone = signals.locale?.timezone;
+  if (ipTimezone && browserTimezone && ipTimezone !== browserTimezone) {
+    checks.push({ check: 'timezone_ip_mismatch', passed: false, details: `Browser TZ (${browserTimezone}) != IP TZ (${ipTimezone})` });
+  } else {
+    checks.push({ check: 'timezone_ip_mismatch', passed: true, details: 'Timezone aligns with IP geolocation' });
+  }
 
   // Mobile vs Touch
   const isMobile = signals.client?.user_agent_parsed?.device?.type === 'mobile';
@@ -24,17 +29,41 @@ export function runConsistencyChecks(signals: any) {
   }
 
   // Hardware Concurrency
-  if (signals.hardware?.hardware_concurrency === 1) {
+  const cores = signals.hardware?.hardware_concurrency;
+  if (cores === 1) {
     checks.push({ check: 'suspicious_concurrency', passed: false, details: 'Reported 1 CPU core (often anti-detect default)' });
+  } else if (cores && cores % 2 !== 0) {
+    checks.push({ check: 'suspicious_concurrency', passed: false, details: `Odd number of CPU cores (${cores}) is impossible on real hardware` });
   } else {
     checks.push({ check: 'suspicious_concurrency', passed: true, details: 'CPU core count typical' });
   }
 
+  // Device Memory
+  const mem = signals.hardware?.device_memory;
+  const validMem = [0.25, 0.5, 1, 2, 4, 8, 16];
+  if (!isMobile && mem < 2) {
+    checks.push({ check: 'suspicious_memory', passed: false, details: `Desktop device with < 2GB RAM (${mem}GB) is highly suspicious` });
+  } else if (mem && !validMem.includes(mem)) {
+    checks.push({ check: 'suspicious_memory', passed: false, details: `Device memory (${mem}GB) is not a standard expected value` });
+  } else {
+    checks.push({ check: 'suspicious_memory', passed: true, details: 'Device memory appears normal' });
+  }
+
   // Fonts count
-  if (signals.rendering?.fonts?.detected_count === 0) {
+  const fontCount = signals.rendering?.fonts?.detected_count;
+  if (fontCount === 0) {
     checks.push({ check: 'font_detection', passed: false, details: 'No system fonts detected (impossible on real OS)' });
+  } else if (!isMobile && fontCount && fontCount < 50) {
+    checks.push({ check: 'font_detection', passed: false, details: `Only ${fontCount} fonts detected on desktop (suspicious)` });
   } else {
     checks.push({ check: 'font_detection', passed: true, details: 'System fonts detected' });
+  }
+
+  // Network info API missing
+  if (signals.network?.connection_api === null) {
+    checks.push({ check: 'network_api_blocked', passed: false, details: 'Network Information API is null (often blocked by privacy browsers like Brave)' });
+  } else {
+    checks.push({ check: 'network_api_blocked', passed: true, details: 'Network Information API available' });
   }
 
   return checks;

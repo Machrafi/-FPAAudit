@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { runFullScan } from "@/lib/scanner";
+import { runFullScan, runDeepScanPermissions } from "@/lib/scanner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,24 @@ export default function ScanPage() {
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [scanData, setScanData] = useState<any>(null);
+  const [isDeepScanning, setIsDeepScanning] = useState(false);
+  const [deepScanComplete, setDeepScanComplete] = useState(false);
   const [sessionId] = useState(() => `local_${nanoid(8)}`);
+
+  const execDeepScan = async () => {
+    setIsDeepScanning(true);
+    try {
+      const results = await runDeepScanPermissions();
+      setScanData((prev: any) => ({
+         ...prev,
+         deep_permissions: results
+      }));
+      setDeepScanComplete(true);
+    } catch (e) {
+      console.error(e);
+    }
+    setIsDeepScanning(false);
+  };
 
   useEffect(() => {
     async function executeScan() {
@@ -299,7 +316,18 @@ export default function ScanPage() {
                  { label: 'ASN Identifier', value: scanData.network.asn, integrity: 'RECOGNIZED' },
                  { label: 'ISP Entity', value: scanData.network.asn_org, integrity: 'STABLE' },
                  { label: 'WebRTC Internal Leak', value: scanData.network.webrtc_local_ips?.join(', ') || 'N/A', integrity: scanData.network.webrtc_local_ips?.length ? 'LOCAL LEAK' : 'ISOLATED' },
-                 { label: 'WebRTC Public Leak', value: scanData.network.webrtc_public_ips?.join(', ') || 'N/A', integrity: scanData.network.webrtc_leaked ? 'CROSS-IP LEAK' : 'CONSISTENT' }
+                 { label: 'WebRTC Public Leak', value: scanData.network.webrtc_public_ips?.join(', ') || 'N/A', integrity: scanData.network.webrtc_leaked ? 'CROSS-IP LEAK' : 'CONSISTENT' },
+                 { label: 'JA3 TLS Fingerprint', value: scanData.network.tls_fingerprint?.ja3_hash || 'N/A', integrity: 'EXTRACTED' },
+                 { label: 'JA4 Fingerprint', value: scanData.network.tls_fingerprint?.ja4 || 'N/A', integrity: 'EXTRACTED' },
+                 { label: 'PeetPrint Hash', value: scanData.network.tls_fingerprint?.peetprint_hash || 'N/A', integrity: 'STABLE' },
+                 { label: 'HTTP/2 Support', value: scanData.network.tls_fingerprint?.http2 ? `TRUE (${scanData.network.tls_fingerprint.http_version})` : 'FALSE', integrity: 'STANDARD' },
+                 { label: 'Akamai HTTP/2 Fingerprint', value: scanData.network.tls_fingerprint?.http2_akamai_hash || 'N/A', integrity: 'MEASURED' },
+                 { label: 'HTTP/2 Frames', value: scanData.network.tls_fingerprint?.http2_framesCount !== null ? String(scanData.network.tls_fingerprint.http2_framesCount) : 'N/A', integrity: 'MEASURED' },
+                 { label: 'Used TLS Version', value: scanData.network.tls_fingerprint?.used_tls || 'N/A', integrity: 'NEGOTIATED' },
+                 { label: 'Supported HTTP (ALPN)', value: scanData.network.tls_fingerprint?.supported_http?.join(', ') || 'N/A', integrity: 'STANDARD' },
+                 { label: 'Supported TLS Versions', value: scanData.network.tls_fingerprint?.supported_tls?.join(', ') || 'N/A', integrity: 'STANDARD' },
+                 { label: 'TLS Ciphers / Exts / Curves', value: `${scanData.network.tls_fingerprint?.tls_ciphers?.length || 0} Ciphers, ${scanData.network.tls_fingerprint?.tls_extensions?.length || 0} Exts, ${scanData.network.tls_fingerprint?.tls_curves?.length || 0} Curves`, integrity: 'PROFILE' },
+                 { label: 'IP TTL', value: scanData.network.tls_fingerprint?.ip_ttl !== null ? String(scanData.network.tls_fingerprint.ip_ttl) : 'N/A', integrity: 'ROUTING_HOP' }
                ]} />
              </div>
            </div>
@@ -371,6 +399,55 @@ export default function ScanPage() {
                  { label: 'Indicator Count', value: String(scanData.automation_detection.headless_chrome_indicators.length), integrity: 'CRITICAL' },
                  { label: 'JS Integrity Leak', value: String(scanData.automation_detection.function_tostring_modified), integrity: 'SPOOFED' }
                ]} />
+             </div>
+           </div>
+
+           <div className="bg-zinc-900/20 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+             <div className="bg-zinc-950 border-b border-zinc-800 p-4 flex items-center gap-3">
+               <Monitor className="w-5 h-5 text-cyan-400" />
+               <h2 className="font-bold text-white uppercase tracking-widest text-sm">Deep Signatures (Passive)</h2>
+             </div>
+             <div className="p-6 space-y-4">
+               <SignalTable items={[
+                 { label: 'Permissions API Mocks', value: JSON.stringify(scanData.deep.permissions_state), integrity: 'MEASURED' },
+                 { label: 'Storage APIs', value: `Local: ${scanData.deep.storage.localStorageWorks}, IDX: ${scanData.deep.storage.indexedDBWorks}`, integrity: 'PERSISTENCE' },
+                 { label: 'Math Hash', value: scanData.deep.math_fingerprint, integrity: 'CPU_LEAK' },
+                 { label: 'Video Codecs Supported', value: String(scanData.deep.codecs.video.length), integrity: 'MEDIA' },
+                 { label: 'Audio Codecs Supported', value: String(scanData.deep.codecs.audio.length), integrity: 'MEDIA' },
+                 { label: 'WebGPU Render Adapter', value: typeof scanData.hardware.webgpu === 'string' ? scanData.hardware.webgpu : JSON.stringify(scanData.hardware.webgpu), integrity: 'EXTRACTED' },
+                 { label: 'Mime Types / Plugins', value: `Mimes: ${scanData.deep.mime_types.count}, Plugins: ${scanData.deep.plugins.count}`, integrity: 'FINGERPRINT' },
+                 { label: 'CSS Media Queries', value: scanData.deep.css_media_queries?.join(', ') || 'None', integrity: 'UI_STATE' },
+                 { label: 'Behavioral Entropy', value: `Mouse: ${scanData.deep.behavioral?.mouse_entropy.toFixed(2)}, Typing: ${scanData.deep.behavioral?.typing_cadence}`, integrity: 'HEURISTIC' }
+               ]} />
+             </div>
+           </div>
+
+           <div className="bg-zinc-900/40 border border-cyan-800/30 rounded-xl overflow-hidden shadow-2xl relative">
+             <div className="bg-cyan-950/30 border-b border-cyan-900/50 p-4 flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                 <h2 className="font-bold text-white uppercase tracking-widest text-sm">Active Deep Scan (Requires Permissions)</h2>
+               </div>
+               {!deepScanComplete && (
+                 <Button onClick={execDeepScan} disabled={isDeepScanning} className="bg-cyan-500 hover:bg-cyan-400 text-zinc-950 text-xs font-bold uppercase tracking-widest h-8">
+                   {isDeepScanning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : "Run Deep Scan"}
+                 </Button>
+               )}
+             </div>
+             <div className="p-6">
+               {!deepScanComplete ? (
+                 <div className="text-sm font-mono text-zinc-500 mb-2">
+                   Grant explicit permissions to perform a full device diagnostic. Extracts exact Geolocation, Media Device Labels, precise Storage Quotas, and Battery analytics to bypass hardware spoofing.<br/><br/>
+                   <span className="text-cyan-600/80 italic">Note: Permissions are exclusively used for this diagnostic step and immediately released.</span>
+                 </div>
+               ) : (
+                 <SignalTable items={[
+                  { label: 'Real Geolocation', value: scanData.deep_permissions?.geolocation?.lat ? `${scanData.deep_permissions.geolocation.lat}, ${scanData.deep_permissions.geolocation.lng}` : JSON.stringify(scanData.deep_permissions?.geolocation), integrity: scanData.deep_permissions?.geolocation?.lat ? 'EXPOSED' : 'BLOCKED' },
+                  { label: 'Media Device Labels', value: Array.isArray(scanData.deep_permissions?.mediaDevices) ? scanData.deep_permissions.mediaDevices.map((d:any) => d.label || d.kind).join(', ') : JSON.stringify(scanData.deep_permissions?.mediaDevices), integrity: 'ENUMERATED' },
+                  { label: 'Disk Quota Limits', value: scanData.deep_permissions?.storageEstimate ? `${scanData.deep_permissions.storageEstimate.quota_gb.toFixed(2)} GB Max` : 'N/A', integrity: 'HARDWARE' },
+                  { label: 'Battery Analytics', value: scanData.deep_permissions?.battery ? `${scanData.deep_permissions.battery.level * 100}% (${scanData.deep_permissions.battery.charging ? 'Charging' : 'Discharging'})` : 'N/A', integrity: 'PHYSICAL' }
+                 ]} />
+               )}
              </div>
            </div>
         </div>

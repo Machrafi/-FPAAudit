@@ -8,31 +8,33 @@ export const PLATFORM_PROFILES: Record<string, PlatformProfile> = {
     name: "Amazon Appstore",
     weights: {
       "ip_type_datacenter": 1.0,
+      "ip_type_vpn": 0.8,
       "webrtc_leak_real_ip": 1.0,
       "navigator_webdriver": 1.0,
       "headless_chrome": 0.95,
       "automation_globals": 0.95,
-      "canvas_fingerprint_match": 0.8,
-      "webgl_fingerprint_match": 0.8,
-      "audio_fingerprint_match": 0.75,
-      "font_list_match": 0.7,
+      "font_detection_suspicious": 0.4,
       "timezone_ip_mismatch": 0.7,
-      "ua_platform_inconsistency": 0.65,
-      "hardware_concurrency_suspicious": 0.5,
-      "language_locale_mismatch": 0.5,
-      "screen_resolution_suspicious": 0.4
+      "device_memory_suspicious": 0.5,
+      "ua_platform_inconsistency": 0.6,
+      "hardware_concurrency_suspicious": 0.4,
+      "network_api_blocked": 0.3
     }
   },
   google_play: {
     name: "Google Play",
     weights: {
       "ip_type_datacenter": 1.0,
+      "webrtc_leak_real_ip": 1.0,
       "navigator_webdriver": 1.0,
       "headless_chrome": 0.95,
       "automation_globals": 0.9,
-      "device_memory_low": 0.8,
-      "screen_resolution_suspicious": 0.7,
-      "timezone_ip_mismatch": 0.85
+      "device_memory_suspicious": 0.5,
+      "font_detection_suspicious": 0.4,
+      "hardware_concurrency_suspicious": 0.4,
+      "timezone_ip_mismatch": 0.7,
+      "network_api_blocked": 0.3,
+      "ua_platform_inconsistency": 0.6
     }
   },
   paypal: {
@@ -40,43 +42,63 @@ export const PLATFORM_PROFILES: Record<string, PlatformProfile> = {
     weights: {
       "ip_type_vpn": 0.9,
       "ip_type_datacenter": 0.8,
-      "webrtc_leak_real_ip": 0.95,
+      "webrtc_leak_real_ip": 1.0,
       "navigator_webdriver": 1.0,
-      "headless_chrome": 0.9,
-      "ua_platform_inconsistency": 0.8
+      "headless_chrome": 1.0,
+      "timezone_ip_mismatch": 0.7,
+      "device_memory_suspicious": 0.5,
+      "hardware_concurrency_suspicious": 0.4,
+      "font_detection_suspicious": 0.4,
+      "ua_platform_inconsistency": 0.6,
+      "network_api_blocked": 0.4
     }
   },
   stripe: {
     name: "Stripe",
     weights: {
-      "ip_type_datacenter": 0.7,
+      "ip_type_datacenter": 0.8,
+      "webrtc_leak_real_ip": 1.0,
       "navigator_webdriver": 1.0,
       "headless_chrome": 0.9,
-      "canvas_fingerprint_match": 0.6,
-      "webgl_fingerprint_match": 0.6
+      "timezone_ip_mismatch": 0.7,
+      "device_memory_suspicious": 0.5,
+      "font_detection_suspicious": 0.4,
+      "hardware_concurrency_suspicious": 0.4,
+      "network_api_blocked": 0.3,
+      "ua_platform_inconsistency": 0.6
     }
   },
   facebook_ads: {
     name: "Facebook Ads",
     weights: {
       "ip_type_datacenter": 1.0,
+      "ip_type_vpn": 0.9,
+      "webrtc_leak_real_ip": 1.0,
       "headless_chrome": 0.95,
+      "navigator_webdriver": 1.0,
       "automation_globals": 0.95,
-      "webgl_fingerprint_match": 0.8,
-      "canvas_fingerprint_match": 0.8,
-      "font_list_match": 0.8,
-      "audio_fingerprint_match": 0.8
+      "device_memory_suspicious": 0.5,
+      "font_detection_suspicious": 0.4,
+      "timezone_ip_mismatch": 0.7,
+      "ua_platform_inconsistency": 0.6,
+      "hardware_concurrency_suspicious": 0.4,
+      "network_api_blocked": 0.3
     }
   },
   google_ads: {
     name: "Google Ads",
     weights: {
       "ip_type_datacenter": 1.0,
+      "webrtc_leak_real_ip": 1.0,
       "headless_chrome": 0.95,
+      "navigator_webdriver": 1.0,
       "automation_globals": 0.95,
-      "canvas_fingerprint_match": 0.9,
-      "webgl_fingerprint_match": 0.9,
-      "audio_fingerprint_match": 0.8
+      "device_memory_suspicious": 0.5,
+      "font_detection_suspicious": 0.4,
+      "hardware_concurrency_suspicious": 0.4,
+      "timezone_ip_mismatch": 0.7,
+      "ua_platform_inconsistency": 0.6,
+      "network_api_blocked": 0.4
     }
   }
 };
@@ -93,8 +115,10 @@ export function computeRiskScores(signals: any, consistency: any[]) {
     automation_globals: signals.automation_detection?.automation_globals_detected?.length > 0,
     ua_platform_inconsistency: consistency.some(c => c.check === 'ua_platform_mismatch' && !c.passed),
     timezone_ip_mismatch: consistency.some(c => c.check === 'timezone_ip_mismatch' && !c.passed),
-    device_memory_low: signals.hardware?.device_memory <= 4,
-    hardware_concurrency_suspicious: signals.hardware?.hardware_concurrency === 1,
+    device_memory_suspicious: consistency.some(c => c.check === 'suspicious_memory' && !c.passed),
+    hardware_concurrency_suspicious: consistency.some(c => c.check === 'suspicious_concurrency' && !c.passed),
+    font_detection_suspicious: consistency.some(c => c.check === 'font_detection' && !c.passed),
+    network_api_blocked: consistency.some(c => c.check === 'network_api_blocked' && !c.passed),
     screen_resolution_suspicious: signals.hardware?.screen?.width === 800 || signals.hardware?.screen?.width === 1024,
     canvas_fingerprint_match: false, // Placeholder for v1 as we don't have global DB match yet
     webgl_fingerprint_match: false,
@@ -115,12 +139,19 @@ export function computeRiskScores(signals: any, consistency: any[]) {
       }
     });
 
-    const normalized = (totalPossible > 0) ? Math.round((rawScore / totalPossible) * 100) : 0;
+    let normalized = (totalPossible > 0) ? Math.round((rawScore / totalPossible) * 100) : 0;
     
+    // Critical Overrides
+    if (activeRisks.webrtc_leak_real_ip || activeRisks.navigator_webdriver) {
+      normalized = Math.max(normalized, 100);
+    } else if (activeRisks.headless_chrome || activeRisks.automation_globals) {
+      normalized = Math.max(normalized, 85); // High risk minimum
+    }
+
     let level = 'Low';
     if (normalized > 80) level = 'Critical';
-    else if (normalized > 60) level = 'High';
-    else if (normalized > 30) level = 'Medium';
+    else if (normalized > 50) level = 'High';
+    else if (normalized > 25) level = 'Medium';
 
     scores[key] = {
       score: normalized,

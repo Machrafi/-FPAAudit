@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Using ipapi.co free endpoint which provides JSON
-    // No API key required for the basic rate-limited endpoint
-    const response = await fetch('https://ipapi.co/json/', {
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    
+    // x-forwarded-for can be a comma-separated list; we want the first external IP
+    const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || '');
+
+    // Determine target URL for ipapi
+    // If running locally, we might get IPv6 localhost or 127.0.0.1, fallback to global lookup
+    let url = 'https://ipapi.co/json/';
+    if (clientIp && clientIp !== '::1' && clientIp !== '127.0.0.1') {
+      url = `https://ipapi.co/${clientIp}/json/`;
+    }
+
+    const response = await fetch(url, {
       headers: {
         'User-Agent': 'FPA-Audit-Diagnostic-Tool/1.0',
       },
