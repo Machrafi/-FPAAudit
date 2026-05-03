@@ -15,6 +15,8 @@ export default function ComparePage() {
   const [comparison, setComparison] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [urlA, setUrlA] = useState('');
+  const [urlB, setUrlB] = useState('');
   const router = useRouter();
 
   const handleShareForAI = async () => {
@@ -32,6 +34,27 @@ export default function ComparePage() {
       alert("Failed to share report");
     }
     setShareLoading(false);
+  };
+
+  const loadFromUrl = async (url: string, target: 'A' | 'B') => {
+    try {
+      // If user pasted the viewer page URL, convert it to the api route
+      let apiUrl = url;
+      if (url.includes('/report/')) {
+        const id = url.split('/report/')[1].split('/')[0].split('?')[0];
+        apiUrl = `/api/report/${id}`;
+      }
+      
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Could not load report from URL");
+      
+      const json = await res.json();
+      if (target === 'A') setDataA(json);
+      else setDataB(json);
+      setError(null);
+    } catch (err) {
+      setError(`Failed to load ${target} from URL.`);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'A' | 'B') => {
@@ -136,6 +159,18 @@ export default function ComparePage() {
               <Upload className="w-8 h-8 text-zinc-700 mx-auto mb-2 group-hover:text-cyan-400" />
               <p className="text-xs font-mono text-zinc-500">{dataA ? `fpa_audit_${dataA.scan_meta.timestamp.slice(0,10)}.json` : "Click to upload JSON profile"}</p>
             </div>
+            <div className="flex gap-2 items-center">
+              <input 
+                type="text"
+                placeholder="Or paste share URL..."
+                value={urlA}
+                onChange={e => setUrlA(e.target.value)}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-cyan-500"
+              />
+              <Button onClick={() => loadFromUrl(urlA, 'A')} disabled={!urlA} size="sm" variant="outline" className="text-xs uppercase font-bold tracking-widest border-zinc-800 hover:text-cyan-400">
+                Load
+              </Button>
+            </div>
           </Card>
 
           <Card className="bg-zinc-900 border-zinc-800 p-6 space-y-4">
@@ -152,6 +187,18 @@ export default function ComparePage() {
               />
               <Upload className="w-8 h-8 text-zinc-700 mx-auto mb-2 group-hover:text-cyan-400" />
               <p className="text-xs font-mono text-zinc-500">{dataB ? `fpa_audit_${dataB.scan_meta.timestamp.slice(0,10)}.json` : "Click to upload JSON profile"}</p>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input 
+                type="text"
+                placeholder="Or paste share URL..."
+                value={urlB}
+                onChange={e => setUrlB(e.target.value)}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-cyan-500"
+              />
+              <Button onClick={() => loadFromUrl(urlB, 'B')} disabled={!urlB} size="sm" variant="outline" className="text-xs uppercase font-bold tracking-widest border-zinc-800 hover:text-cyan-400">
+                Load
+              </Button>
             </div>
           </Card>
         </div>
