@@ -41,6 +41,23 @@ export default function ScanPage() {
   const [isDeepScanning, setIsDeepScanning] = useState(false);
   const [deepScanComplete, setDeepScanComplete] = useState(false);
   const [sessionId] = useState(() => `local_${nanoid(8)}`);
+  const [shareLoading, setShareLoading] = useState(false);
+
+  const handleShareForAI = async () => {
+    setShareLoading(true);
+    try {
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'scan', data: scanData })
+      });
+      const { id } = await res.json();
+      router.push(`/report/${id}`);
+    } catch (e) {
+      alert("Failed to share report");
+    }
+    setShareLoading(false);
+  };
 
   const execDeepScan = async () => {
     setIsDeepScanning(true);
@@ -180,6 +197,9 @@ export default function ScanPage() {
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="hidden md:flex gap-2 border-zinc-800 text-xs font-bold uppercase tracking-widest" onClick={() => window.location.reload()}>
             <RefreshCw className="w-3 h-3" /> New Scan
+          </Button>
+          <Button onClick={handleShareForAI} disabled={shareLoading} className="bg-cyan-900 border border-cyan-800 hover:bg-cyan-800 text-cyan-50 font-bold px-4 text-xs uppercase tracking-widest">
+            {shareLoading ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : <Share2 className="w-3 h-3 mr-2" />} Share for AI
           </Button>
           <Button onClick={downloadJSON} className="bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-4 text-xs uppercase tracking-widest">
             <Download className="w-3 h-3 mr-2" /> Export JSON

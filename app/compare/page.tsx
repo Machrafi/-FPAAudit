@@ -2,17 +2,37 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ShieldCheck, ShieldAlert, ArrowLeftRight, ChevronLeft, Upload, Info } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ArrowLeftRight, ChevronLeft, Upload, Info, Share2, Loader2 } from "lucide-react";
 
 export default function ComparePage() {
   const [dataA, setDataA] = useState<any>(null);
   const [dataB, setDataB] = useState<any>(null);
   const [comparison, setComparison] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const router = useRouter();
+
+  const handleShareForAI = async () => {
+    if (!comparison) return;
+    setShareLoading(true);
+    try {
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'compare', data: { dataA, dataB, diff: comparison } })
+      });
+      const { id } = await res.json();
+      router.push(`/report/${id}`);
+    } catch (e) {
+      alert("Failed to share report");
+    }
+    setShareLoading(false);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'A' | 'B') => {
     const file = e.target.files?.[0];
@@ -93,6 +113,11 @@ export default function ComparePage() {
             <div className="technical-label">Advanced Differential Diagnostics</div>
             <h1 className="text-4xl font-bold text-white tracking-widest uppercase italic">Local Side-by-Side</h1>
           </div>
+          {comparison && (
+            <Button onClick={handleShareForAI} disabled={shareLoading} className="bg-cyan-900 border border-cyan-800 hover:bg-cyan-800 text-cyan-50 font-bold px-4 text-xs uppercase tracking-widest">
+              {shareLoading ? <Loader2 className="w-3 h-3 mr-2 animate-spin" /> : <Share2 className="w-3 h-3 mr-2" />} Share for AI
+            </Button>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
